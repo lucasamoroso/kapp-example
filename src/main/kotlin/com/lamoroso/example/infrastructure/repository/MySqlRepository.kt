@@ -2,26 +2,38 @@ package com.lamoroso.example.infrastructure.repository
 
 import arrow.core.Either
 import arrow.core.flatten
+import com.lamoroso.example.domain.user.User
+import com.lamoroso.example.domain.user.UserTable
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import mu.KotlinLogging
 import org.ktorm.database.Database
-import org.ktorm.dsl.AssignmentsBuilder
-import org.ktorm.dsl.insertAndGenerateKey
+import org.ktorm.dsl.*
 import org.ktorm.schema.BaseTable
+import org.ktorm.schema.ColumnDeclaring
 
 object MySqlRepository {
     private val log = KotlinLogging.logger {}
 
     private val connection = buildDatasource().map { ds -> Database.connect(ds) }
 
-    fun <T : BaseTable<*>> doInsert(table: T, block: AssignmentsBuilder.(T) -> Unit): Either<Throwable, Any> {
+    fun <T : BaseTable<*>, R> doInsertAndReturnKey(table: T, block: AssignmentsBuilder.(T) -> Unit): Either<Throwable, R> {
         return connection.map { db ->
             Either.catch {
                 db.useTransaction {
                     log.info { "Inserting new record in table ${table.tableName}" }
-                    db.insertAndGenerateKey(table, block)
+                    db.insertAndGenerateKey(table, block) as R
                 }
+            }
+        }.flatten()
+    }
+
+    fun <T : BaseTable<*>> doSelect(table: T, condition: ColumnDeclaring<Boolean>): Either<Throwable, Query> {
+        return connection.map { db ->
+            Either.catch {
+                    log.debug { "Executing query in ${table.tableName} with condition ${condition.sqlType.toString()}" }
+                    val a = db.from(table).select().where(condition)
+                a
             }
         }.flatten()
     }

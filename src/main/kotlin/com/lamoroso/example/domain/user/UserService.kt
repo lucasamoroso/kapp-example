@@ -1,13 +1,14 @@
 package com.lamoroso.example.domain.user
 
 import arrow.core.Either
+import arrow.core.flatten
 import mu.KotlinLogging
 
 object UserService {
     private val log = KotlinLogging.logger {}
 
-    fun save(user: User): Either<UserError, User> {
-        return user
+    fun save(user: User): Either<UserError, Int> =
+        user
             .asValidated()
             .fold({ msg ->
                 log.info { "Invalid user: $msg" }
@@ -15,11 +16,19 @@ object UserService {
             }, { validated ->
                 log.info { "Creating new user ${validated.name}" }
                 UserRepository.save(validated)
-                    .mapLeft { throwable ->
-                        log.error("Couldn't save user ${validated.name}. Reason ${throwable.message}", throwable)
-                        UserPersistenceError(throwable.message)
-                    }
             })
 
-    }
+    fun getUser(id: Int): Either<UserError, User> =
+        UserRepository
+            .get(id)
+            .map { users ->
+                if (users.size == 1) Either.Right(users[0])
+                else {
+                    if (users.isEmpty()) Either.Left(UserNotFoundError("The user $id was not found"))
+                    else Either.Left(UserDataCorruptionError("There is more than one user with id $id"))
+                }
+            }
+            .flatten()
+
+
 }

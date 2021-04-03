@@ -1,0 +1,3 @@
+package com.lamoroso.example.infrastructure.repository
+
+interface RepositoryError

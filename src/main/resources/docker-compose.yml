@@ -1,0 +1,16 @@
+version: '3'
+services:
+  mysql-kapp-db:
+    container_name: mysql-kapp_db
+    image: mysql:latest
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+    environment:
+      - MYSQL_ROOT_PASSWORD=test
+      - MYSQL_DATABASE=kapp
+      - MYSQL_USER=local
+      - MYSQL_PASSWORD=test
+      - MYSQL_ROOT_HOST=%
+

@@ -2,8 +2,6 @@ package com.lamoroso.example.infrastructure.repository
 
 import arrow.core.Either
 import arrow.core.flatten
-import com.lamoroso.example.domain.user.User
-import com.lamoroso.example.domain.user.UserTable
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import mu.KotlinLogging
@@ -17,7 +15,10 @@ object MySqlRepository {
 
     private val connection = buildDatasource().map { ds -> Database.connect(ds) }
 
-    fun <T : BaseTable<*>, R> doInsertAndReturnKey(table: T, block: AssignmentsBuilder.(T) -> Unit): Either<Throwable, R> {
+    fun <T : BaseTable<*>, R> doInsertAndReturnKey(
+        table: T,
+        block: AssignmentsBuilder.(T) -> Unit
+    ): Either<Throwable, R> {
         return connection.map { db ->
             Either.catch {
                 db.useTransaction {
@@ -31,9 +32,18 @@ object MySqlRepository {
     fun <T : BaseTable<*>> doSelect(table: T, condition: ColumnDeclaring<Boolean>): Either<Throwable, Query> {
         return connection.map { db ->
             Either.catch {
-                    log.debug { "Executing query in ${table.tableName} with condition ${condition.sqlType.toString()}" }
-                    val a = db.from(table).select().where(condition)
-                a
+                log.debug { "Executing select in ${table.tableName} with condition ${condition.sqlType.toString()}" }
+                db.from(table).select().where(condition)
+            }
+        }.flatten()
+    }
+
+    fun <T : BaseTable<*>> doSelect(table: T): Either<Throwable, Query> {
+        return connection.map { db ->
+            Either.catch {
+                log.debug { "Executing select in ${table.tableName}" }
+                db.from(table).select()
+
             }
         }.flatten()
     }

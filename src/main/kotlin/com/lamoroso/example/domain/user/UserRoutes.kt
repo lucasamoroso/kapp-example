@@ -1,74 +1,82 @@
 package com.lamoroso.example.domain.user
 
-import arrow.core.Either
-import arrow.core.flatMap
+import arrow.core.Option
+import arrow.core.getOrElse
 import com.lamoroso.example.infrastructure.repository.RepositoryError
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import com.lamoroso.example.infrastructure.utils.response.runAsync
+import io.ktor.application.*
+import io.ktor.http.HttpStatusCode.Companion.BadRequest
+import io.ktor.http.HttpStatusCode.Companion.InternalServerError
+import io.ktor.http.HttpStatusCode.Companion.NotFound
+import io.ktor.request.*
+import io.ktor.response.*
+import io.ktor.routing.*
+import io.ktor.util.pipeline.*
 import mu.KotlinLogging
-import org.http4k.core.Method
-import org.http4k.core.Request
-import org.http4k.core.Response
-import org.http4k.core.Status.Companion.BAD_REQUEST
-import org.http4k.core.Status.Companion.INTERNAL_SERVER_ERROR
-import org.http4k.core.Status.Companion.NOT_FOUND
-import org.http4k.core.Status.Companion.OK
-import org.http4k.routing.RoutingHttpHandler
-import org.http4k.routing.bind
-import org.http4k.routing.path
-import org.http4k.routing.routes
 
 object UserRoutes {
 
     private val log = KotlinLogging.logger {}
 
-    val userRoutes =
-        routes(
-            "/users" bind routes(getUser(), getUsers(), createUser())
-        )
 
-    private fun getUsers(): RoutingHttpHandler =
-        "/" bind Method.GET to {
-            val users = emptyList<String>()
-            log.info { "Listing all users" }
-            Response(OK).body(Json.encodeToString(users))
+    fun Application.registerUserRoutes() {
+        routing {
+            route("/users") {
+                listUsersRoute()
+                getUserRoute()
+                createUserRoute()
+            }
         }
+    }
 
-    private fun getUser(): RoutingHttpHandler =
-        "/{id}" bind Method.GET to { req: Request ->
-            Either.catch { req.path("id") }
-                .mapLeft { throwable ->
-                    log.error("Unexpected error reading query parameter. Reason ${throwable.message}", throwable)
-                    InvalidUserError("The provided user id is invalid")
-                }
-                .flatMap { id -> UserService.getUser(id!!.toInt()) }
+    private fun Route.listUsersRoute() {
+        get("/") {
+            call.runAsync { UserService.listUsers() }
                 .fold({ userError -> toErrorResponse(userError) },
-                    { user -> Response(OK).body(Json.encodeToString(user)) }
-                )
-
-        }
-
-    private fun createUser() =
-        "/" bind Method.POST to { req: Request ->
-            Either.catch { Json.decodeFromString<User>(req.bodyString()) }
-                .mapLeft { throwable ->
-                    log.error("Unexpected error serializing incoming user. Reason ${throwable.message}", throwable)
-                    UserSerializationError(throwable.message)
-                }
-                .flatMap { user -> UserService.save(user) }
-                .fold({ userError -> toErrorResponse(userError) },
-                    { userId -> Response(OK).body(Json.encodeToString(userId)) }
+                    { users -> call.respond(users) }
                 )
         }
+    }
 
-    private fun toErrorResponse(userError: UserError): Response =
+    private fun Route.getUserRoute() {
+        get("/{id}") {
+            Option
+                .fromNullable(call.parameters["id"])
+                .map { userId ->
+                    //Run async, in another coroutine, then response
+                    call
+                        .runAsync { UserService.getUser(userId.toInt()) }
+                        .fold({ userError -> toErrorResponse(userError) },
+                            { user -> call.respond(user) }
+                        )
+                }
+                .getOrElse { call.respond(BadRequest) }
+
+        }
+    }
+
+    private fun Route.createUserRoute() {
+        post("/") {
+            val user = call.receive<User>()
+            //Run async, in another coroutine, then response
+            call
+                .runAsync { UserService.save(user) }
+                .fold({ userError -> toErrorResponse(userError) },
+                    { userId -> call.respond(userId) }
+                )
+        }
+    }
+
+
+    private suspend fun PipelineContext<Unit, ApplicationCall>.toErrorResponse(
+        userError: UserError
+    ) {
         when (userError) {
-            is RepositoryError -> Response(INTERNAL_SERVER_ERROR).body(Json.encodeToString(userError))
-            is UserSerializationError -> Response(BAD_REQUEST).body(Json.encodeToString(userError))
-            is InvalidUserError -> Response(BAD_REQUEST).body(Json.encodeToString(userError))
-            is UserNotFoundError -> Response(NOT_FOUND).body(Json.encodeToString(userError))
-            else -> Response(INTERNAL_SERVER_ERROR).body(Json.encodeToString(userError))
+            is RepositoryError -> call.respond(status = InternalServerError, userError)
+            is InvalidUserError -> call.respond(status = BadRequest, userError)
+            is UserNotFoundError -> call.respond(status = NotFound, userError)
+            else -> call.respond(status = BadRequest, userError)
         }
+    }
 
 }

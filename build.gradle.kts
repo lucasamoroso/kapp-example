@@ -36,14 +36,15 @@ dependencies {
     //hikari
     implementation("com.zaxxer:HikariCP:4.0.3")
 
-    //http4k
-    implementation("org.http4k:http4k-core:4.5.0.1")
-    implementation("org.http4k:http4k-server-netty:4.5.0.1")
-    implementation("org.http4k:http4k-format-kotlinx-serialization:4.5.0.1")
-    implementation("org.http4k:http4k-opentelemetry:4.5.0.1")
+    //ktor
+    implementation("io.ktor:ktor-server-core:1.5.3")
+    implementation("io.ktor:ktor-server-netty:1.5.3")
+    implementation("io.ktor:ktor-serialization:1.5.3")
 
-    //open-telemetry
-    implementation("io.opentelemetry:opentelemetry-extension-aws:1.0.1")
+    //guava
+    implementation ("com.google.guava:guava:30.1.1-jre")
+
+
 
     //Loging
     implementation("io.github.microutils:kotlin-logging-jvm:2.0.6")

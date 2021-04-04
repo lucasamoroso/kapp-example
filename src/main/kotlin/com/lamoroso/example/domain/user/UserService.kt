@@ -2,6 +2,7 @@ package com.lamoroso.example.domain.user
 
 import arrow.core.Either
 import arrow.core.flatten
+import com.lamoroso.example.infrastructure.repository.MySqlRepository
 import mu.KotlinLogging
 
 object UserService {
@@ -18,8 +19,9 @@ object UserService {
                 UserRepository.save(validated)
             })
 
-    fun getUser(id: Int): Either<UserError, User> =
-        UserRepository
+    fun getUser(id: Int): Either<UserError, User> {
+        log.info { "Looking for user $id" }
+        return UserRepository
             .get(id)
             .map { users ->
                 if (users.size == 1) Either.Right(users[0])
@@ -29,6 +31,12 @@ object UserService {
                 }
             }
             .flatten()
+    }
+
+    fun listUsers() : Either<UserError, List<User>> {
+        log.info { "Listing all users" }
+        return UserRepository.list()
+    }
 
 
 }

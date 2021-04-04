@@ -5,7 +5,6 @@ import kotlinx.serialization.Serializable
 
 interface UserError
 
-@Serializable data class UserSerializationError(val message: String?) : UserError
 @Serializable data class InvalidUserError(val message: String) : UserError
 @Serializable data class UserNotFoundError(val message: String = "User not found") : UserError
 

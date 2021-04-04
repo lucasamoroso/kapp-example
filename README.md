@@ -19,7 +19,7 @@ docker-compose -f src/main/resources/docker-compose.yml up -d && gradle run
 
 ```curl
 curl --request POST \
-  --url http://localhost:8080/kapp/users \
+  --url http://localhost:8080/users/ \
   --header 'Content-Type: application/json' \
   --data '{
 	"name":"lucas",
